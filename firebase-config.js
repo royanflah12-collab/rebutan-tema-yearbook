@@ -1,5 +1,5 @@
 export const firebaseConfig = {
-  apiKey: "API_KEY_KAMU",
+  apiKey: "AIzaSyCURMLsgC4f3-x5myHIGdwMQJv912QZCX0",
   authDomain: "tema-yearbook.firebaseapp.com",
   databaseURL: "https://tema-yearbook-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "tema-yearbook",
