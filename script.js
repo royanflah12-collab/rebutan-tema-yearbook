@@ -12,7 +12,7 @@ import {
   signInAnonymously
 } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
 
-import { firebaseConfig } from "./firebase-config.js?v=6";
+import { firebaseConfig } from "./firebase-config.js?v=7";
 
 
 /* ==================================================
@@ -28,7 +28,8 @@ const CLASSES = Array.from(
 
 
 /* ==================================================
-   KATA UMUM YANG BOLEH DIGUNAKAN BERULANG
+   KATA UMUM
+   Kata-kata ini TIDAK dihitung sebagai bentrok.
 ================================================== */
 
 const STOP_WORDS = new Set([
@@ -68,8 +69,180 @@ const STOP_WORDS = new Set([
   "down",
   "about",
   "after",
-  "before"
+  "before",
+  "style",
+  "theme",
+  "concept",
+  "world"
 ]);
+
+
+/* ==================================================
+   KELOMPOK KATA / WORD FAMILY
+
+   Kata-kata dalam satu kelompok dianggap sama.
+================================================== */
+
+const WORD_FAMILIES = [
+
+  [
+    "arab",
+    "arabic",
+    "arabian"
+  ],
+
+  [
+    "america",
+    "american"
+  ],
+
+  [
+    "africa",
+    "african"
+  ],
+
+  [
+    "asia",
+    "asian"
+  ],
+
+  [
+    "europe",
+    "european"
+  ],
+
+  [
+    "japan",
+    "japanese"
+  ],
+
+  [
+    "china",
+    "chinese"
+  ],
+
+  [
+    "korea",
+    "korean"
+  ],
+
+  [
+    "india",
+    "indian"
+  ],
+
+  [
+    "italy",
+    "italian"
+  ],
+
+  [
+    "france",
+    "french"
+  ],
+
+  [
+    "germany",
+    "german"
+  ],
+
+  [
+    "spain",
+    "spanish"
+  ],
+
+  [
+    "brazil",
+    "brazilian"
+  ],
+
+  [
+    "mexico",
+    "mexican"
+  ],
+
+  [
+    "greece",
+    "greek"
+  ],
+
+  [
+    "egypt",
+    "egyptian"
+  ],
+
+  [
+    "viking",
+    "vikings"
+  ],
+
+  [
+    "pirate",
+    "pirates"
+  ],
+
+  [
+    "future",
+    "futuristic"
+  ],
+
+  [
+    "technology",
+    "tech",
+    "technological"
+  ],
+
+  [
+    "fantasy",
+    "fantastic"
+  ],
+
+  [
+    "magic",
+    "magical"
+  ],
+
+  [
+    "mystery",
+    "mysterious"
+  ],
+
+  [
+    "adventure",
+    "adventurous"
+  ],
+
+  [
+    "dream",
+    "dreamy"
+  ],
+
+  [
+    "dark",
+    "darkness"
+  ],
+
+  [
+    "night",
+    "nighttime"
+  ],
+
+  [
+    "space",
+    "spatial"
+  ],
+
+  [
+    "ocean",
+    "oceanic"
+  ],
+
+  [
+    "nature",
+    "natural"
+  ]
+
+];
 
 
 /* ==================================================
@@ -114,7 +287,7 @@ const confirmBtn =
 
 
 /* ==================================================
-   FIREBASE VARIABLES
+   FIREBASE
 ================================================== */
 
 let db = null;
@@ -146,7 +319,7 @@ function setStatus(
 
 
 /* ==================================================
-   NORMALISASI TEKS
+   NORMALISASI
 ================================================== */
 
 function normalizeTheme(text) {
@@ -155,6 +328,45 @@ function normalizeTheme(text) {
     .trim()
     .toLowerCase()
     .replace(/\s+/g, " ");
+}
+
+
+/* ==================================================
+   NORMALISASI KATA
+================================================== */
+
+function normalizeWord(word) {
+
+  let clean =
+    word
+      .toLowerCase()
+      .trim();
+
+
+  /*
+    Cari apakah kata masuk
+    salah satu word family.
+  */
+
+  for (
+    const family of WORD_FAMILIES
+  ) {
+
+    if (
+      family.includes(clean)
+    ) {
+
+      /*
+        Semua anggota keluarga
+        memiliki ID yang sama.
+      */
+
+      return family[0];
+    }
+  }
+
+
+  return clean;
 }
 
 
@@ -173,15 +385,21 @@ function getImportantWords(text) {
 
     .split(/\s+/)
 
-    .filter(word =>
-      word &&
-      !STOP_WORDS.has(word)
+    .map(
+      word =>
+        normalizeWord(word)
+    )
+
+    .filter(
+      word =>
+        word &&
+        !STOP_WORDS.has(word)
     );
 }
 
 
 /* ==================================================
-   KEY FIREBASE
+   FIREBASE KEY
 ================================================== */
 
 function themeKey(text) {
@@ -195,8 +413,7 @@ function themeKey(text) {
 
     .replace(
       /^_+|_+$/g,
-      ""
-    );
+      "");
 }
 
 
@@ -221,7 +438,7 @@ function esc(text) {
 
 
 /* ==================================================
-   AMBIL SEMUA TEMA
+   SEMUA TEMA
 ================================================== */
 
 function getAllThemes(
@@ -240,7 +457,7 @@ function getAllThemes(
 
 
 /* ==================================================
-   AMBIL TEMA MILIK KELAS
+   TEMA MILIK KELAS
 ================================================== */
 
 function getClassThemes(
@@ -257,7 +474,7 @@ function getClassThemes(
 
 
 /* ==================================================
-   CARI KATA YANG BENTROK
+   CEK KATA BENTROK
 ================================================== */
 
 function findWordConflict(
@@ -279,24 +496,24 @@ function findWordConflict(
       );
 
 
-    const conflict =
-      newWords.find(
-        word =>
-          oldWords.includes(word)
-      );
+    for (
+      const newWord of newWords
+    ) {
 
+      if (
+        oldWords.includes(newWord)
+      ) {
 
-    if (conflict) {
+        return {
 
-      return {
+          word: newWord,
 
-        word: conflict,
+          theme: item.theme,
 
-        theme: item.theme,
+          takenBy: item.takenBy
 
-        takenBy: item.takenBy
-
-      };
+        };
+      }
     }
   }
 
@@ -306,7 +523,7 @@ function findWordConflict(
 
 
 /* ==================================================
-   RENDER DAFTAR TEMA
+   RENDER
 ================================================== */
 
 function render() {
@@ -314,8 +531,6 @@ function render() {
   const arr =
     getAllThemes(records);
 
-
-  /* Urut berdasarkan waktu */
 
   arr.sort(
     (a, b) =>
@@ -325,7 +540,7 @@ function render() {
 
 
   /* ==================================================
-     DAFTAR TEMA
+     LIST TEMA
   ================================================== */
 
   empty.style.display =
@@ -437,7 +652,7 @@ function render() {
 
 
 /* ==================================================
-   BUKA MODAL
+   MODAL
 ================================================== */
 
 function openModal() {
@@ -449,8 +664,6 @@ function openModal() {
     themeInput.value.trim();
 
 
-  /* Kelas belum dipilih */
-
   if (!selectedClass) {
 
     setStatus(
@@ -461,8 +674,6 @@ function openModal() {
     return;
   }
 
-
-  /* Tema kosong */
 
   if (!theme) {
 
@@ -476,7 +687,7 @@ function openModal() {
 
 
   /* ==================================================
-     CEK MAKSIMAL 2 TEMA
+     CEK MAX 2 TEMA
   ================================================== */
 
   const classThemes =
@@ -500,7 +711,7 @@ function openModal() {
 
 
   /* ==================================================
-     CEK KATA BENTROK
+     CEK WORD FAMILY
   ================================================== */
 
   const conflict =
@@ -512,17 +723,13 @@ function openModal() {
   if (conflict) {
 
     setStatus(
-      `❌ Kata <b>“${esc(conflict.word)}”</b> sudah digunakan dalam tema <b>“${esc(conflict.theme)}”</b> oleh <b>${esc(conflict.takenBy)}</b>.`,
+      `❌ Kata <b>“${esc(conflict.word)}”</b> bentrok dengan tema <b>“${esc(conflict.theme)}”</b> milik <b>${esc(conflict.takenBy)}</b>.`,
       "error"
     );
 
     return;
   }
 
-
-  /* ==================================================
-     BUKA MODAL
-  ================================================== */
 
   pendingTheme =
     theme;
@@ -537,10 +744,6 @@ function openModal() {
   );
 }
 
-
-/* ==================================================
-   TUTUP MODAL
-================================================== */
 
 function closeModal() {
 
@@ -560,7 +763,7 @@ cancelBtn.onclick =
 
 
 /* ==================================================
-   KONFIRMASI REBUT TEMA
+   KONFIRMASI
 ================================================== */
 
 confirmBtn.onclick =
@@ -612,10 +815,6 @@ confirmBtn.onclick =
 
     try {
 
-      /* ==================================================
-         TRANSACTION
-      ================================================== */
-
       const themesRef =
         ref(
           db,
@@ -634,7 +833,7 @@ confirmBtn.onclick =
 
 
             /* ==================================================
-               CEK JUMLAH TEMA KELAS
+               MAX 2 TEMA
             ================================================== */
 
             const classThemes =
@@ -654,7 +853,7 @@ confirmBtn.onclick =
 
 
             /* ==================================================
-               CEK KATA BENTROK
+               WORD FAMILY CHECK
             ================================================== */
 
             const conflict =
@@ -671,7 +870,7 @@ confirmBtn.onclick =
 
 
             /* ==================================================
-               SIMPAN TEMA
+               SIMPAN
             ================================================== */
 
             currentData[
@@ -679,20 +878,17 @@ confirmBtn.onclick =
             ] = {
 
               theme:
-
                 theme,
 
               takenBy:
-
                 selectedClass,
 
               takenAt:
-
                 Date.now(),
 
               uid:
-
                 currentUser.uid
+
             };
 
 
@@ -718,20 +914,17 @@ confirmBtn.onclick =
           "success"
         );
 
-
         return;
       }
 
 
       /* ==================================================
-         GAGAL — CEK ULANG DATA
+         GAGAL
       ================================================== */
 
       const latestData =
         records || {};
 
-
-      /* Cek kelas */
 
       const latestClassThemes =
         getClassThemes(
@@ -754,8 +947,6 @@ confirmBtn.onclick =
       }
 
 
-      /* Cek kata */
-
       const latestConflict =
         findWordConflict(
           theme,
@@ -768,7 +959,7 @@ confirmBtn.onclick =
       ) {
 
         setStatus(
-          `❌ Kata <b>“${esc(latestConflict.word)}”</b> sudah digunakan dalam tema <b>“${esc(latestConflict.theme)}”</b> oleh <b>${esc(latestConflict.takenBy)}</b>.`,
+          `❌ Kata <b>“${esc(latestConflict.word)}”</b> bentrok dengan tema <b>“${esc(latestConflict.theme)}”</b> milik <b>${esc(latestConflict.takenBy)}</b>.`,
           "error"
         );
 
@@ -845,7 +1036,7 @@ resetLocal.onclick =
 
 
 /* ==================================================
-   MULAI FIREBASE
+   START FIREBASE
 ================================================== */
 
 async function start() {
@@ -856,8 +1047,6 @@ async function start() {
       "1. Memulai Firebase..."
     );
 
-
-    /* Cek config */
 
     if (!firebaseConfig) {
 
@@ -877,25 +1066,11 @@ async function start() {
     }
 
 
-    console.log(
-      "2. Firebase config ditemukan."
-    );
-
-
-    /* Initialize */
-
     const app =
       initializeApp(
         firebaseConfig
       );
 
-
-    console.log(
-      "3. Firebase berhasil diinisialisasi."
-    );
-
-
-    /* Database */
 
     db =
       getDatabase(
@@ -903,17 +1078,10 @@ async function start() {
       );
 
 
-    /* Auth */
-
     auth =
       getAuth(
         app
       );
-
-
-    console.log(
-      "4. Database dan Auth siap."
-    );
 
 
     setStatus(
@@ -921,8 +1089,6 @@ async function start() {
       "info"
     );
 
-
-    /* Anonymous login */
 
     const credential =
       await signInAnonymously(
@@ -934,12 +1100,6 @@ async function start() {
       credential.user;
 
 
-    console.log(
-      "5. Anonymous berhasil:",
-      currentUser.uid
-    );
-
-
     setStatus(
       "🟢 Anonymous berhasil — membaca database...",
       "success"
@@ -947,7 +1107,7 @@ async function start() {
 
 
     /* ==================================================
-       REAL-TIME LISTENER
+       REAL-TIME
     ================================================== */
 
     onValue(
@@ -984,21 +1144,16 @@ async function start() {
 
         setStatus(
           `❌ Database error:<br>
-
           <b>
             ${esc(
               error?.code ||
               "UNKNOWN"
             )}
-          </b>
-
-          <br>
-
+          </b><br>
           ${esc(
             error?.message ||
             String(error)
           )}`,
-
           "error"
         );
       }
@@ -1008,30 +1163,8 @@ async function start() {
   } catch (error) {
 
     console.error(
-      "======================"
-    );
-
-
-    console.error(
       "FIREBASE ERROR:",
       error
-    );
-
-
-    console.error(
-      "ERROR CODE:",
-      error?.code
-    );
-
-
-    console.error(
-      "ERROR MESSAGE:",
-      error?.message
-    );
-
-
-    console.error(
-      "======================"
     );
 
 
@@ -1048,17 +1181,8 @@ async function start() {
 
     setStatus(
       `❌ Anonymous gagal.<br>
-
-      <b>
-        KODE: ${esc(code)}
-      </b>
-
-      <br>
-
-      <small>
-        ${esc(message)}
-      </small>`,
-
+      <b>KODE: ${esc(code)}</b><br>
+      <small>${esc(message)}</small>`,
       "error"
     );
   }
@@ -1066,7 +1190,7 @@ async function start() {
 
 
 /* ==================================================
-   JALANKAN SISTEM
+   JALANKAN
 ================================================== */
 
 render();
