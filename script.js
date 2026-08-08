@@ -142,5 +142,6 @@ async function start(){
     }
   }
 }
-}
-render();start();
+
+render();
+start();
