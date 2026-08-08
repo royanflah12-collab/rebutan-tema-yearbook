@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#080b16">
+<title>Rebutan Tema Yearbook</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="bg"></div>
+<main class="container">
+<header class="hero">
+  <div class="badge">YEARBOOK • 16 KELAS • REAL-TIME</div>
+  <h1>REBUTAN TEMA<br><span>YEARBOOK</span></h1>
+  <p>Setiap kelas bebas menentukan temanya sendiri. Siapa yang berhasil merebut lebih dulu, tema langsung terkunci.</p>
+</header>
+
+<section class="panel">
+  <div class="topbar">
+    <div>
+      <label for="classSelect">1. Pilih kelas</label>
+      <select id="classSelect">
+        <option value="">— Pilih kelas —</option>
+        <option>XII F-1</option><option>XII F-2</option><option>XII F-3</option><option>XII F-4</option>
+        <option>XII F-5</option><option>XII F-6</option><option>XII F-7</option><option>XII F-8</option>
+        <option>XII F-9</option><option>XII F-10</option><option>XII F-11</option><option>XII F-12</option>
+        <option>XII F-13</option><option>XII F-14</option><option>XII F-15</option><option>XII F-16</option>
+      </select>
+    </div>
+    <div class="live"><span class="dot"></span> LIVE REAL-TIME</div>
+  </div>
+
+  <div class="form-row">
+    <div class="input-wrap">
+      <label for="themeInput">2. Tulis tema yang ingin direbut</label>
+      <input id="themeInput" type="text" maxlength="80" placeholder="Contoh: The Great Gatsby" autocomplete="off">
+    </div>
+    <button id="takeBtn" class="primary big">REBUT TEMA ⚡</button>
+  </div>
+
+  <div id="status" class="status info">Hubungkan Firebase terlebih dahulu melalui <b>firebase-config.js</b>.</div>
+</section>
+
+<section class="panel">
+  <div class="section-head">
+    <div>
+      <h2>🔥 Tema yang Sudah Direbut</h2>
+      <p>Daftar ini diperbarui otomatis di semua HP tanpa refresh.</p>
+    </div>
+    <button id="resetLocal" class="ghost">Ganti kelas</button>
+  </div>
+  <div id="empty" class="empty">Belum ada tema yang direbut.</div>
+  <div id="takenList" class="taken-list"></div>
+</section>
+
+<section class="panel">
+  <div class="section-head">
+    <div>
+      <h2>📊 Status Kelas</h2>
+      <p>Setiap kelas hanya boleh memiliki satu tema.</p>
+    </div>
+  </div>
+  <div id="classStatus" class="class-grid"></div>
+</section>
+
+<footer>Sistem Rebutan Tema Yearbook • Gunakan satu link website yang sama untuk seluruh kelas.</footer>
+</main>
+
+<div id="modal" class="modal hidden">
+  <div class="modal-card">
+    <div class="modal-icon">⚡</div>
+    <h3>Konfirmasi Rebut Tema</h3>
+    <p id="modalText"></p>
+    <div class="modal-actions">
+      <button id="cancelBtn" class="ghost">Batal</button>
+      <button id="confirmBtn" class="primary">REBUT SEKARANG</button>
+    </div>
+  </div>
+</div>
+<script type="module" src="script.js"></script>
+</body>
+</html>
