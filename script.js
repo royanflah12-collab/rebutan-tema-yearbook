@@ -118,29 +118,16 @@ async function start(){
   } catch (e) {
     console.error("Firebase/Auth error:", e);
 
-    if (e.code === "auth/operation-not-allowed") {
-      setStatus(
-        "❌ Anonymous Authentication belum diaktifkan.",
-        "error"
-      );
-    } else if (e.code === "auth/unauthorized-domain") {
-      setStatus(
-        "❌ Domain GitHub Pages belum diizinkan di Firebase Authentication.",
-        "error"
-      );
-    } else if (e.code === "auth/network-request-failed") {
-      setStatus(
-        "❌ Gagal terhubung ke Firebase. Periksa koneksi internet.",
-        "error"
-      );
-    } else {
-      setStatus(
-        "❌ Anonymous gagal: " + e.code,
-        "error"
-      );
-    }
+    const errorCode = e?.code || "UNKNOWN";
+    const errorMessage = e?.message || String(e);
+
+    setStatus(
+      `❌ Anonymous gagal.<br>
+       <small>Kode: ${errorCode}</small><br>
+       <small>${errorMessage}</small>`,
+      "error"
+    );
   }
-}
 
 render();
 start();
