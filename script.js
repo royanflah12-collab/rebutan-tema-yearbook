@@ -1,7 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
 import { getDatabase, ref, onValue, runTransaction } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-database.js";
-import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
-import { firebaseConfig } from "./firebase-config.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
 
 const CLASSES = Array.from({length:16},(_,i)=>`XII F-${i+1}`);
 const classSelect=document.querySelector("#classSelect"), themeInput=document.querySelector("#themeInput");
