@@ -1,7 +1,7 @@
 export const firebaseConfig = {
-  apiKey: "AIzaSyCURMLsgC4f3-x5myHIGdwMQJv912QZCX0",
+  apiKey: "AIzaSyCURMLsgC4f3-x5myHIGdwMQJv9l2QZCX0",
   authDomain: "tema-yearbook.firebaseapp.com",
-  databaseURL: "https://tema-yearbook-default-rtdb.asia-southeast1.firebasedatabase.app/",
+  databaseURL: "https://tema-yearbook-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "tema-yearbook",
   storageBucket: "tema-yearbook.firebasestorage.app",
   messagingSenderId: "750246371563",
