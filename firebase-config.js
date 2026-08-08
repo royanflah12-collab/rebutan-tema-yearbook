@@ -1,4 +1,3 @@
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
   apiKey: "AIzaSyCURMLsgC4f3-x5myHIGdwMQJv9l2QZCX0",
   authDomain: "tema-yearbook.firebaseapp.com",
