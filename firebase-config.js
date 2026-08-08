@@ -1,22 +1,10 @@
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyCURMLsgC4f3-x5myHIGdwMQJv9l2QZCX0",
+export const firebaseConfig = {
+  apiKey: "AIzaSyCURMLsgC4f3-x5myHIGdwMQJv912QZCX0",
   authDomain: "tema-yearbook.firebaseapp.com",
-  databaseURL: "https://tema-yearbook-default-rtdb.asia-southeast1.firebasedatabase.app",
+  databaseURL: "MASUKKAN_DATABASE_URL_KAMU",
   projectId: "tema-yearbook",
   storageBucket: "tema-yearbook.firebasestorage.app",
   messagingSenderId: "750246371563",
   appId: "1:750246371563:web:808e0880a2dd82a31d1eae",
   measurementId: "G-K53YDLCTDW"
 };
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
