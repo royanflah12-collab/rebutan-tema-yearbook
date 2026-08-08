@@ -10,7 +10,7 @@ import {
   signInAnonymously
 } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
 
-import { firebaseConfig } from "./firebase-config.js?v=2";
+import { firebaseConfig } from "./firebase-config.js?v=3";
 
 const CLASSES = Array.from(
   { length: 16 },
@@ -21,13 +21,10 @@ const classSelect = document.querySelector("#classSelect");
 const themeInput = document.querySelector("#themeInput");
 const takeBtn = document.querySelector("#takeBtn");
 const statusBox = document.querySelector("#status");
-
 const takenList = document.querySelector("#takenList");
 const empty = document.querySelector("#empty");
 const classStatus = document.querySelector("#classStatus");
-
 const resetLocal = document.querySelector("#resetLocal");
-
 const modal = document.querySelector("#modal");
 const modalText = document.querySelector("#modalText");
 const cancelBtn = document.querySelector("#cancelBtn");
@@ -36,43 +33,17 @@ const confirmBtn = document.querySelector("#confirmBtn");
 let db = null;
 let auth = null;
 let currentUser = null;
-
 let records = {};
 let pendingTheme = "";
-
-/* =========================
-   CLASS YANG TERSIMPAN
-========================= */
-
-const savedClass = localStorage.getItem("ybClass");
-
-if (savedClass && CLASSES.includes(savedClass)) {
-  classSelect.value = savedClass;
-}
-
-/* =========================
-   STATUS
-========================= */
 
 function setStatus(text, type = "info") {
   statusBox.className = `status ${type}`;
   statusBox.innerHTML = text;
 }
 
-/* =========================
-   NORMALISASI TEMA
-========================= */
-
 function norm(text) {
-  return text
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, " ");
+  return text.trim().toLowerCase().replace(/\s+/g, " ");
 }
-
-/* =========================
-   MEMBUAT KEY DATABASE
-========================= */
 
 function key(text) {
   return norm(text)
@@ -80,14 +51,10 @@ function key(text) {
     .replace(/^_|_$/g, "");
 }
 
-/* =========================
-   KEAMANAN TAMPILAN HTML
-========================= */
-
 function esc(text) {
   return String(text).replace(
     /[&<>"']/g,
-    (char) => ({
+    char => ({
       "&": "&amp;",
       "<": "&lt;",
       ">": "&gt;",
@@ -97,371 +64,202 @@ function esc(text) {
   );
 }
 
-/* =========================
-   MENAMPILKAN DATA
-========================= */
-
 function render() {
   const arr = Object.entries(records)
-    .filter(
-      ([_, value]) =>
-        value &&
-        value.takenBy &&
-        value.theme
-    )
-    .map(([databaseKey, value]) => ({
-      key: databaseKey,
-      ...value
-    }));
+    .filter(([_, v]) => v && v.takenBy && v.theme)
+    .map(([k, v]) => ({ key: k, ...v }));
 
-  arr.sort(
-    (a, b) =>
-      (a.takenAt || 0) -
-      (b.takenAt || 0)
-  );
+  arr.sort((a, b) => (a.takenAt || 0) - (b.takenAt || 0));
 
-  /* DAFTAR TEMA */
+  empty.style.display = arr.length ? "none" : "block";
 
-  empty.style.display =
-    arr.length ? "none" : "block";
-
-  takenList.innerHTML = arr
-    .map(
-      (record, index) => `
-        <div class="taken-card">
-
-          <div class="rank">
-            ${index + 1}
-          </div>
-
-          <div>
-            <div class="theme-name">
-              ${esc(record.theme)}
-            </div>
-
-            <div class="owner">
-              DIREBUT OLEH
-              <b>${esc(record.takenBy)}</b>
-            </div>
-          </div>
-
-          <div class="lock">
-            🔒 TERKUNCI
-          </div>
-
+  takenList.innerHTML = arr.map((r, i) => `
+    <div class="taken-card">
+      <div class="rank">${i + 1}</div>
+      <div>
+        <div class="theme-name">${esc(r.theme)}</div>
+        <div class="owner">
+          DIREBUT OLEH <b>${esc(r.takenBy)}</b>
         </div>
-      `
-    )
-    .join("");
-
-  /* STATUS 16 KELAS */
+      </div>
+      <div class="lock">🔒 TERKUNCI</div>
+    </div>
+  `).join("");
 
   const byClass = {};
 
-  arr.forEach((record) => {
-    byClass[record.takenBy] =
-      record.theme;
+  arr.forEach(r => {
+    byClass[r.takenBy] = r.theme;
   });
 
-  classStatus.innerHTML = CLASSES
-    .map((className) =>
-      byClass[className]
-        ? `
-          <div class="class-card done">
-            <b>${esc(className)}</b>
-            <span>
-              🔒 ${esc(byClass[className])}
-            </span>
-          </div>
-        `
-        : `
-          <div class="class-card">
-            <b>${esc(className)}</b>
-            <span>
-              🟢 Belum memilih
-            </span>
-          </div>
-        `
-    )
-    .join("");
+  classStatus.innerHTML = CLASSES.map(c =>
+    byClass[c]
+      ? `
+        <div class="class-card done">
+          <b>${esc(c)}</b>
+          <span>🔒 ${esc(byClass[c])}</span>
+        </div>
+      `
+      : `
+        <div class="class-card">
+          <b>${esc(c)}</b>
+          <span>🟢 Belum memilih</span>
+        </div>
+      `
+  ).join("");
 }
 
-/* =========================
-   MODAL KONFIRMASI
-========================= */
-
 function openModal() {
-  const selectedClass =
-    classSelect.value;
+  const c = classSelect.value;
+  const t = themeInput.value.trim();
 
-  const theme =
-    themeInput.value.trim();
-
-  if (!selectedClass) {
-    setStatus(
-      "⚠️ Pilih kelas terlebih dahulu.",
-      "error"
-    );
+  if (!c) {
+    setStatus("⚠️ Pilih kelas terlebih dahulu.", "error");
     return;
   }
 
-  if (!theme) {
-    setStatus(
-      "⚠️ Tulis tema terlebih dahulu.",
-      "error"
-    );
+  if (!t) {
+    setStatus("⚠️ Tulis tema terlebih dahulu.", "error");
     return;
   }
 
-  pendingTheme = theme;
+  pendingTheme = t;
 
-  modalText.innerHTML = `
-    Kelas <b>${esc(selectedClass)}</b>
-    akan merebut tema
-    <b>“${esc(theme)}”</b>.
-    <br><br>
-    Setelah berhasil,
-    tema ini tidak dapat dipakai
-    kelas lain.
-  `;
+  modalText.innerHTML =
+    `Kelas <b>${esc(c)}</b> akan merebut tema <b>“${esc(t)}”</b>.`;
 
   modal.classList.remove("hidden");
 }
-
-/* =========================
-   TUTUP MODAL
-========================= */
 
 function closeModal() {
   modal.classList.add("hidden");
   pendingTheme = "";
 }
 
-/* =========================
-   TOMBOL REBUT
-========================= */
-
 takeBtn.onclick = openModal;
-
 cancelBtn.onclick = closeModal;
 
-/* =========================
-   KONFIRMASI REBUT TEMA
-========================= */
-
 confirmBtn.onclick = async () => {
-
-  const selectedClass =
-    classSelect.value;
-
-  const theme =
-    pendingTheme.trim();
+  const c = classSelect.value;
+  const t = pendingTheme.trim();
 
   if (!db || !currentUser) {
     setStatus(
-      "❌ Firebase belum terhubung. Tunggu sampai status berubah menjadi Terhubung.",
-      "error"
-    );
-    return;
-  }
-
-  if (!selectedClass) {
-    setStatus(
-      "⚠️ Pilih kelas terlebih dahulu.",
-      "error"
-    );
-    return;
-  }
-
-  if (!theme) {
-    setStatus(
-      "⚠️ Tulis tema terlebih dahulu.",
+      "❌ Firebase belum terhubung.",
       "error"
     );
     return;
   }
 
   closeModal();
-
   takeBtn.disabled = true;
 
-  setStatus(
-    "⏳ Mengamankan tema...",
-    "info"
-  );
-
-  const databaseKey = key(theme);
-
-  const themeRef =
-    ref(db, `themes/${databaseKey}`);
-
   try {
+    const themeRef = ref(db, `themes/${key(t)}`);
 
-    const result =
-      await runTransaction(
-        themeRef,
-        (currentData) => {
-
-          /* JIKA SUDAH ADA,
-             JANGAN TIMPA */
-
-          if (
-            currentData &&
-            currentData.takenBy
-          ) {
-            return;
-          }
-
-          /* TEMA BARU */
-
-          return {
-            theme: theme,
-            takenBy: selectedClass,
-            takenAt: Date.now(),
-            uid: currentUser.uid
-          };
+    const result = await runTransaction(
+      themeRef,
+      current => {
+        if (current && current.takenBy) {
+          return;
         }
-      );
+
+        return {
+          theme: t,
+          takenBy: c,
+          takenAt: Date.now(),
+          uid: currentUser.uid
+        };
+      }
+    );
 
     if (result.committed) {
-
       themeInput.value = "";
 
       setStatus(
-        `🎉 BERHASIL!
-        <b>${esc(selectedClass)}</b>
-        mendapatkan tema
-        <b>${esc(theme)}</b>.`,
+        `🎉 BERHASIL! <b>${esc(c)}</b> mendapatkan tema <b>${esc(t)}</b>.`,
         "success"
       );
-
     } else {
-
       setStatus(
-        `❌ Tema
-        <b>${esc(theme)}</b>
-        sudah direbut kelas lain.
-        Silakan pilih tema berbeda.`,
+        `❌ Tema <b>${esc(t)}</b> sudah direbut kelas lain.`,
         "error"
       );
     }
 
   } catch (error) {
-
-    console.error(
-      "Transaction error:",
-      error
-    );
+    console.error("Transaction error:", error);
 
     setStatus(
-      `❌ Gagal merebut tema.
-      <br>
-      <small>
-      ${esc(error?.message || String(error))}
-      </small>`,
+      `❌ Gagal merebut tema.<br>
+       <small>${esc(error?.message || String(error))}</small>`,
       "error"
     );
-
-  } finally {
-
-    takeBtn.disabled = false;
   }
-};
 
-/* =========================
-   GANTI KELAS
-========================= */
+  takeBtn.disabled = false;
+};
 
 classSelect.onchange = () => {
-
-  localStorage.setItem(
-    "ybClass",
-    classSelect.value
-  );
-
+  localStorage.setItem("ybClass", classSelect.value);
   render();
 };
-
-/* =========================
-   RESET PILIHAN KELAS DI HP
-========================= */
 
 resetLocal.onclick = () => {
-
   classSelect.value = "";
-
-  localStorage.removeItem(
-    "ybClass"
-  );
-
+  localStorage.removeItem("ybClass");
   render();
 };
-
-/* =========================
-   MULAI FIREBASE
-========================= */
 
 async function start() {
 
   try {
 
-    /* CEK CONFIG */
+    console.log("1. Memulai Firebase");
 
-    if (
-      !firebaseConfig ||
-      !firebaseConfig.apiKey ||
-      firebaseConfig.apiKey.startsWith("GANTI_") ||
-      !firebaseConfig.databaseURL
-    ) {
-
-      setStatus(
-        "❌ Firebase config belum benar.",
-        "error"
-      );
-
-      return;
+    if (!firebaseConfig) {
+      throw new Error("firebaseConfig tidak ditemukan");
     }
 
-    /* INISIALISASI FIREBASE */
+    if (!firebaseConfig.apiKey) {
+      throw new Error("apiKey Firebase kosong");
+    }
 
-    const app =
-      initializeApp(firebaseConfig);
+    console.log("2. Firebase config ditemukan");
+
+    const app = initializeApp(firebaseConfig);
+
+    console.log("3. Firebase berhasil diinisialisasi");
 
     db = getDatabase(app);
-
     auth = getAuth(app);
 
+    console.log("4. Database dan Auth siap");
+
     setStatus(
-      "⏳ Menghubungkan ke Firebase...",
+      "⏳ Login Anonymous...",
       "info"
     );
 
-    /* =========================
-       LOGIN ANONYMOUS
-    ========================= */
-
-    const userCredential =
-      await signInAnonymously(auth);
-
-    currentUser =
-      userCredential.user;
+    const credential = await signInAnonymously(auth);
 
     console.log(
-      "Anonymous login berhasil:",
-      currentUser.uid
+      "5. Anonymous berhasil:",
+      credential
     );
 
-    /* =========================
-       BACA DATABASE
-    ========================= */
+    currentUser = credential.user;
+
+    setStatus(
+      "🟢 Anonymous berhasil — membaca database...",
+      "success"
+    );
 
     onValue(
       ref(db, "themes"),
 
-      (snapshot) => {
-
-        records =
-          snapshot.val() || {};
+      snapshot => {
+        records = snapshot.val() || {};
 
         render();
 
@@ -471,24 +269,17 @@ async function start() {
         );
       },
 
-      (error) => {
+      error => {
 
         console.error(
-          "Database error:",
+          "DATABASE ERROR:",
           error
         );
 
         setStatus(
-          `❌ Tidak bisa membaca database.
-          <br>
-          <small>
-          Kode:
-          ${esc(error?.code || "UNKNOWN")}
-          </small>
-          <br>
-          <small>
-          ${esc(error?.message || String(error))}
-          </small>`,
+          `❌ Database error:<br>
+           <b>${esc(error?.code || "TIDAK ADA KODE")}</b><br>
+           ${esc(error?.message || String(error))}`,
           "error"
         );
       }
@@ -497,35 +288,51 @@ async function start() {
   } catch (error) {
 
     console.error(
-      "Firebase/Auth error:",
+      "======================"
+    );
+
+    console.error(
+      "FIREBASE ERROR:",
       error
     );
 
-    const errorCode =
-      error?.code || "UNKNOWN";
+    console.error(
+      "ERROR CODE:",
+      error?.code
+    );
 
-    const errorMessage =
+    console.error(
+      "ERROR MESSAGE:",
+      error?.message
+    );
+
+    console.error(
+      "ERROR NAME:",
+      error?.name
+    );
+
+    console.error(
+      "======================"
+    );
+
+    const code =
+      error?.code ||
+      error?.name ||
+      "UNKNOWN";
+
+    const message =
       error?.message ||
-      String(error);
+      String(error) ||
+      "Tidak ada pesan error.";
 
     setStatus(
-      `❌ Anonymous gagal.
-      <br>
-      <small>
-      Kode: ${esc(errorCode)}
-      </small>
-      <br>
-      <small>
-      ${esc(errorMessage)}
-      </small>`,
+      `❌ Anonymous gagal.<br>
+       <b>KODE: ${esc(code)}</b><br>
+       <small>${esc(message)}</small>`,
       "error"
     );
   }
-}
-
-/* =========================
-   JALANKAN WEBSITE
-========================= */
+};
 
 render();
 start();
