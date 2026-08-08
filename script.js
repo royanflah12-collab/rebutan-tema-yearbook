@@ -71,12 +71,76 @@ classSelect.onchange=()=>{
   localStorage.setItem("ybClass",classSelect.value);render();
 };
 resetLocal.onclick=()=>{classSelect.value="";localStorage.removeItem("ybClass");render()};
-
 async function start(){
-  if(firebaseConfig.apiKey.startsWith("GANTI_")){render();return}
-  const app=initializeApp(firebaseConfig);db=getDatabase(app);auth=getAuth(app);
-  onValue(ref(db,"themes"),snap=>{records=snap.val()||{};render()},err=>{console.error(err);setStatus("❌ Tidak bisa membaca database.","error")});
-  onAuthStateChanged(auth,user=>{currentUser=user;if(user)setStatus("🟢 Terhubung — sistem real-time aktif.","success")});
-  try{await signInAnonymously(auth)}catch(e){console.error(e);setStatus("❌ Aktifkan Anonymous Authentication di Firebase.","error")}
+  try {
+    if (!firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith("GANTI_")) {
+      setStatus("❌ Firebase config belum benar.", "error");
+      return;
+    }
+
+    const app = initializeApp(firebaseConfig);
+
+    db = getDatabase(app);
+    auth = getAuth(app);
+
+    setStatus("⏳ Menghubungkan ke Firebase...", "info");
+
+    // LOGIN ANONYMOUS DULU
+    const userCredential = await signInAnonymously(auth);
+    currentUser = userCredential.user;
+
+    console.log("Anonymous login berhasil:", currentUser.uid);
+
+    // BARU SETELAH LOGIN, BACA DATABASE
+    onValue(
+      ref(db, "themes"),
+      (snap) => {
+        records = snap.val() || {};
+        render();
+        setStatus("🟢 Terhubung — sistem real-time aktif.", "success");
+      },
+      (error) => {
+        console.error("Database error:", error);
+
+        if (error.code === "PERMISSION_DENIED") {
+          setStatus(
+            "❌ Database ditolak. Periksa Firebase Realtime Database Rules.",
+            "error"
+          );
+        } else {
+          setStatus(
+            "❌ Tidak bisa membaca database: " + error.message,
+            "error"
+          );
+        }
+      }
+    );
+
+  } catch (e) {
+    console.error("Firebase/Auth error:", e);
+
+    if (e.code === "auth/operation-not-allowed") {
+      setStatus(
+        "❌ Anonymous Authentication belum diaktifkan.",
+        "error"
+      );
+    } else if (e.code === "auth/unauthorized-domain") {
+      setStatus(
+        "❌ Domain GitHub Pages belum diizinkan di Firebase Authentication.",
+        "error"
+      );
+    } else if (e.code === "auth/network-request-failed") {
+      setStatus(
+        "❌ Gagal terhubung ke Firebase. Periksa koneksi internet.",
+        "error"
+      );
+    } else {
+      setStatus(
+        "❌ Anonymous gagal: " + e.code,
+        "error"
+      );
+    }
+  }
+}
 }
 render();start();
