@@ -1,59 +1,214 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+
 import {
   getDatabase,
   ref,
   onValue,
   runTransaction
 } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-database.js";
+
 import {
   getAuth,
   signInAnonymously
 } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
 
-import { firebaseConfig } from "./firebase-config.js?v=3";
+import { firebaseConfig } from "./firebase-config.js?v=6";
+
+
+/* ==================================================
+   PENGATURAN
+================================================== */
+
+const MAX_THEME_PER_CLASS = 2;
 
 const CLASSES = Array.from(
   { length: 16 },
   (_, i) => `XII F-${i + 1}`
 );
 
-const classSelect = document.querySelector("#classSelect");
-const themeInput = document.querySelector("#themeInput");
-const takeBtn = document.querySelector("#takeBtn");
-const statusBox = document.querySelector("#status");
-const takenList = document.querySelector("#takenList");
-const empty = document.querySelector("#empty");
-const classStatus = document.querySelector("#classStatus");
-const resetLocal = document.querySelector("#resetLocal");
-const modal = document.querySelector("#modal");
-const modalText = document.querySelector("#modalText");
-const cancelBtn = document.querySelector("#cancelBtn");
-const confirmBtn = document.querySelector("#confirmBtn");
+
+/* ==================================================
+   KATA UMUM YANG BOLEH DIGUNAKAN BERULANG
+================================================== */
+
+const STOP_WORDS = new Set([
+  "the",
+  "a",
+  "an",
+  "in",
+  "on",
+  "of",
+  "and",
+  "to",
+  "for",
+  "at",
+  "by",
+  "with",
+  "from",
+  "into",
+  "over",
+  "under",
+  "is",
+  "are",
+  "be",
+  "as",
+  "it",
+  "its",
+  "this",
+  "that",
+  "these",
+  "those",
+  "my",
+  "your",
+  "our",
+  "their",
+  "his",
+  "her",
+  "up",
+  "down",
+  "about",
+  "after",
+  "before"
+]);
+
+
+/* ==================================================
+   ELEMENT HTML
+================================================== */
+
+const classSelect =
+  document.querySelector("#classSelect");
+
+const themeInput =
+  document.querySelector("#themeInput");
+
+const takeBtn =
+  document.querySelector("#takeBtn");
+
+const statusBox =
+  document.querySelector("#status");
+
+const takenList =
+  document.querySelector("#takenList");
+
+const empty =
+  document.querySelector("#empty");
+
+const classStatus =
+  document.querySelector("#classStatus");
+
+const resetLocal =
+  document.querySelector("#resetLocal");
+
+const modal =
+  document.querySelector("#modal");
+
+const modalText =
+  document.querySelector("#modalText");
+
+const cancelBtn =
+  document.querySelector("#cancelBtn");
+
+const confirmBtn =
+  document.querySelector("#confirmBtn");
+
+
+/* ==================================================
+   FIREBASE VARIABLES
+================================================== */
 
 let db = null;
+
 let auth = null;
+
 let currentUser = null;
+
 let records = {};
+
 let pendingTheme = "";
 
-function setStatus(text, type = "info") {
-  statusBox.className = `status ${type}`;
-  statusBox.innerHTML = text;
+
+/* ==================================================
+   STATUS
+================================================== */
+
+function setStatus(
+  text,
+  type = "info"
+) {
+
+  statusBox.className =
+    `status ${type}`;
+
+  statusBox.innerHTML =
+    text;
 }
 
-function norm(text) {
-  return text.trim().toLowerCase().replace(/\s+/g, " ");
+
+/* ==================================================
+   NORMALISASI TEKS
+================================================== */
+
+function normalizeTheme(text) {
+
+  return String(text)
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
 }
 
-function key(text) {
-  return norm(text)
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_|_$/g, "");
+
+/* ==================================================
+   AMBIL KATA PENTING
+================================================== */
+
+function getImportantWords(text) {
+
+  return normalizeTheme(text)
+
+    .replace(
+      /[^a-z0-9\s]/g,
+      " "
+    )
+
+    .split(/\s+/)
+
+    .filter(word =>
+      word &&
+      !STOP_WORDS.has(word)
+    );
 }
+
+
+/* ==================================================
+   KEY FIREBASE
+================================================== */
+
+function themeKey(text) {
+
+  return normalizeTheme(text)
+
+    .replace(
+      /[^a-z0-9]+/g,
+      "_"
+    )
+
+    .replace(
+      /^_+|_+$/g,
+      ""
+    );
+}
+
+
+/* ==================================================
+   ESCAPE HTML
+================================================== */
 
 function esc(text) {
+
   return String(text).replace(
     /[&<>"']/g,
+
     char => ({
       "&": "&amp;",
       "<": "&lt;",
@@ -64,210 +219,760 @@ function esc(text) {
   );
 }
 
-function render() {
-  const arr = Object.entries(records)
-    .filter(([_, v]) => v && v.takenBy && v.theme)
-    .map(([k, v]) => ({ key: k, ...v }));
 
-  arr.sort((a, b) => (a.takenAt || 0) - (b.takenAt || 0));
+/* ==================================================
+   AMBIL SEMUA TEMA
+================================================== */
 
-  empty.style.display = arr.length ? "none" : "block";
+function getAllThemes(
+  data = records
+) {
 
-  takenList.innerHTML = arr.map((r, i) => `
-    <div class="taken-card">
-      <div class="rank">${i + 1}</div>
-      <div>
-        <div class="theme-name">${esc(r.theme)}</div>
-        <div class="owner">
-          DIREBUT OLEH <b>${esc(r.takenBy)}</b>
-        </div>
-      </div>
-      <div class="lock">🔒 TERKUNCI</div>
-    </div>
-  `).join("");
-
-  const byClass = {};
-
-  arr.forEach(r => {
-    byClass[r.takenBy] = r.theme;
-  });
-
-  classStatus.innerHTML = CLASSES.map(c =>
-    byClass[c]
-      ? `
-        <div class="class-card done">
-          <b>${esc(c)}</b>
-          <span>🔒 ${esc(byClass[c])}</span>
-        </div>
-      `
-      : `
-        <div class="class-card">
-          <b>${esc(c)}</b>
-          <span>🟢 Belum memilih</span>
-        </div>
-      `
-  ).join("");
+  return Object.values(
+    data || {}
+  ).filter(
+    item =>
+      item &&
+      item.theme &&
+      item.takenBy
+  );
 }
+
+
+/* ==================================================
+   AMBIL TEMA MILIK KELAS
+================================================== */
+
+function getClassThemes(
+  className,
+  data = records
+) {
+
+  return getAllThemes(data)
+    .filter(
+      item =>
+        item.takenBy === className
+    );
+}
+
+
+/* ==================================================
+   CARI KATA YANG BENTROK
+================================================== */
+
+function findWordConflict(
+  theme,
+  data = records
+) {
+
+  const newWords =
+    getImportantWords(theme);
+
+
+  for (
+    const item of getAllThemes(data)
+  ) {
+
+    const oldWords =
+      getImportantWords(
+        item.theme
+      );
+
+
+    const conflict =
+      newWords.find(
+        word =>
+          oldWords.includes(word)
+      );
+
+
+    if (conflict) {
+
+      return {
+
+        word: conflict,
+
+        theme: item.theme,
+
+        takenBy: item.takenBy
+
+      };
+    }
+  }
+
+
+  return null;
+}
+
+
+/* ==================================================
+   RENDER DAFTAR TEMA
+================================================== */
+
+function render() {
+
+  const arr =
+    getAllThemes(records);
+
+
+  /* Urut berdasarkan waktu */
+
+  arr.sort(
+    (a, b) =>
+      (a.takenAt || 0) -
+      (b.takenAt || 0)
+  );
+
+
+  /* ==================================================
+     DAFTAR TEMA
+  ================================================== */
+
+  empty.style.display =
+    arr.length
+      ? "none"
+      : "block";
+
+
+  takenList.innerHTML =
+    arr.map(
+      (item, index) => `
+
+        <div class="taken-card">
+
+          <div class="rank">
+            ${index + 1}
+          </div>
+
+          <div>
+
+            <div class="theme-name">
+              ${esc(item.theme)}
+            </div>
+
+            <div class="owner">
+              DIREBUT OLEH
+              <b>
+                ${esc(item.takenBy)}
+              </b>
+            </div>
+
+          </div>
+
+          <div class="lock">
+            🔒 TERKUNCI
+          </div>
+
+        </div>
+
+      `
+    ).join("");
+
+
+  /* ==================================================
+     STATUS KELAS
+  ================================================== */
+
+  classStatus.innerHTML =
+    CLASSES.map(
+      className => {
+
+        const classThemes =
+          getClassThemes(
+            className
+          );
+
+
+        if (
+          classThemes.length
+        ) {
+
+          return `
+
+            <div class="class-card done">
+
+              <b>
+                ${esc(className)}
+              </b>
+
+              <span>
+                🔒
+                ${classThemes.length}/2 tema
+              </span>
+
+              ${classThemes
+                .map(
+                  item => `
+                    <small>
+                      • ${esc(item.theme)}
+                    </small>
+                  `
+                )
+                .join("")}
+
+            </div>
+
+          `;
+        }
+
+
+        return `
+
+          <div class="class-card">
+
+            <b>
+              ${esc(className)}
+            </b>
+
+            <span>
+              🟢 0/2 tema
+            </span>
+
+          </div>
+
+        `;
+      }
+    ).join("");
+}
+
+
+/* ==================================================
+   BUKA MODAL
+================================================== */
 
 function openModal() {
-  const c = classSelect.value;
-  const t = themeInput.value.trim();
 
-  if (!c) {
-    setStatus("⚠️ Pilih kelas terlebih dahulu.", "error");
+  const selectedClass =
+    classSelect.value;
+
+  const theme =
+    themeInput.value.trim();
+
+
+  /* Kelas belum dipilih */
+
+  if (!selectedClass) {
+
+    setStatus(
+      "⚠️ Pilih kelas terlebih dahulu.",
+      "error"
+    );
+
     return;
   }
 
-  if (!t) {
-    setStatus("⚠️ Tulis tema terlebih dahulu.", "error");
+
+  /* Tema kosong */
+
+  if (!theme) {
+
+    setStatus(
+      "⚠️ Tulis tema terlebih dahulu.",
+      "error"
+    );
+
     return;
   }
 
-  pendingTheme = t;
+
+  /* ==================================================
+     CEK MAKSIMAL 2 TEMA
+  ================================================== */
+
+  const classThemes =
+    getClassThemes(
+      selectedClass
+    );
+
+
+  if (
+    classThemes.length >=
+    MAX_THEME_PER_CLASS
+  ) {
+
+    setStatus(
+      `❌ <b>${esc(selectedClass)}</b> sudah memiliki 2 tema. Maksimal 2 tema.`,
+      "error"
+    );
+
+    return;
+  }
+
+
+  /* ==================================================
+     CEK KATA BENTROK
+  ================================================== */
+
+  const conflict =
+    findWordConflict(
+      theme
+    );
+
+
+  if (conflict) {
+
+    setStatus(
+      `❌ Kata <b>“${esc(conflict.word)}”</b> sudah digunakan dalam tema <b>“${esc(conflict.theme)}”</b> oleh <b>${esc(conflict.takenBy)}</b>.`,
+      "error"
+    );
+
+    return;
+  }
+
+
+  /* ==================================================
+     BUKA MODAL
+  ================================================== */
+
+  pendingTheme =
+    theme;
+
 
   modalText.innerHTML =
-    `Kelas <b>${esc(c)}</b> akan merebut tema <b>“${esc(t)}”</b>.`;
+    `Kelas <b>${esc(selectedClass)}</b> akan merebut tema <b>“${esc(theme)}”</b>.`;
 
-  modal.classList.remove("hidden");
+
+  modal.classList.remove(
+    "hidden"
+  );
 }
 
+
+/* ==================================================
+   TUTUP MODAL
+================================================== */
+
 function closeModal() {
-  modal.classList.add("hidden");
+
+  modal.classList.add(
+    "hidden"
+  );
+
   pendingTheme = "";
 }
 
-takeBtn.onclick = openModal;
-cancelBtn.onclick = closeModal;
 
-confirmBtn.onclick = async () => {
-  const c = classSelect.value;
-  const t = pendingTheme.trim();
+takeBtn.onclick =
+  openModal;
 
-  if (!db || !currentUser) {
-    setStatus(
-      "❌ Firebase belum terhubung.",
-      "error"
-    );
-    return;
-  }
+cancelBtn.onclick =
+  closeModal;
 
-  closeModal();
-  takeBtn.disabled = true;
 
-  try {
-    const themeRef = ref(db, `themes/${key(t)}`);
+/* ==================================================
+   KONFIRMASI REBUT TEMA
+================================================== */
 
-    const result = await runTransaction(
-      themeRef,
-      current => {
-        if (current && current.takenBy) {
-          return;
-        }
+confirmBtn.onclick =
+  async () => {
 
-        return {
-          theme: t,
-          takenBy: c,
-          takenAt: Date.now(),
-          uid: currentUser.uid
-        };
-      }
-    );
+    const selectedClass =
+      classSelect.value;
 
-    if (result.committed) {
-      themeInput.value = "";
+    const theme =
+      pendingTheme.trim();
 
-      setStatus(
-        `🎉 BERHASIL! <b>${esc(c)}</b> mendapatkan tema <b>${esc(t)}</b>.`,
-        "success"
-      );
-    } else {
-      setStatus(
-        `❌ Tema <b>${esc(t)}</b> sudah direbut kelas lain.`,
-        "error"
-      );
+
+    if (
+      !selectedClass ||
+      !theme
+    ) {
+
+      closeModal();
+
+      return;
     }
 
-  } catch (error) {
-    console.error("Transaction error:", error);
+
+    if (
+      !db ||
+      !currentUser
+    ) {
+
+      setStatus(
+        "❌ Firebase belum terhubung.",
+        "error"
+      );
+
+      return;
+    }
+
+
+    closeModal();
+
+    takeBtn.disabled =
+      true;
+
 
     setStatus(
-      `❌ Gagal merebut tema.<br>
-       <small>${esc(error?.message || String(error))}</small>`,
-      "error"
+      "⏳ Memproses rebutan tema...",
+      "info"
     );
-  }
 
-  takeBtn.disabled = false;
-};
 
-classSelect.onchange = () => {
-  localStorage.setItem("ybClass", classSelect.value);
-  render();
-};
+    try {
 
-resetLocal.onclick = () => {
-  classSelect.value = "";
-  localStorage.removeItem("ybClass");
-  render();
-};
+      /* ==================================================
+         TRANSACTION
+      ================================================== */
+
+      const themesRef =
+        ref(
+          db,
+          "themes"
+        );
+
+
+      const result =
+        await runTransaction(
+          themesRef,
+
+          currentData => {
+
+            currentData =
+              currentData || {};
+
+
+            /* ==================================================
+               CEK JUMLAH TEMA KELAS
+            ================================================== */
+
+            const classThemes =
+              getClassThemes(
+                selectedClass,
+                currentData
+              );
+
+
+            if (
+              classThemes.length >=
+              MAX_THEME_PER_CLASS
+            ) {
+
+              return;
+            }
+
+
+            /* ==================================================
+               CEK KATA BENTROK
+            ================================================== */
+
+            const conflict =
+              findWordConflict(
+                theme,
+                currentData
+              );
+
+
+            if (conflict) {
+
+              return;
+            }
+
+
+            /* ==================================================
+               SIMPAN TEMA
+            ================================================== */
+
+            currentData[
+              themeKey(theme)
+            ] = {
+
+              theme:
+
+                theme,
+
+              takenBy:
+
+                selectedClass,
+
+              takenAt:
+
+                Date.now(),
+
+              uid:
+
+                currentUser.uid
+            };
+
+
+            return currentData;
+          }
+        );
+
+
+      /* ==================================================
+         BERHASIL
+      ================================================== */
+
+      if (
+        result.committed
+      ) {
+
+        themeInput.value =
+          "";
+
+
+        setStatus(
+          `🎉 BERHASIL! <b>${esc(selectedClass)}</b> mendapatkan tema <b>${esc(theme)}</b>.`,
+          "success"
+        );
+
+
+        return;
+      }
+
+
+      /* ==================================================
+         GAGAL — CEK ULANG DATA
+      ================================================== */
+
+      const latestData =
+        records || {};
+
+
+      /* Cek kelas */
+
+      const latestClassThemes =
+        getClassThemes(
+          selectedClass,
+          latestData
+        );
+
+
+      if (
+        latestClassThemes.length >=
+        MAX_THEME_PER_CLASS
+      ) {
+
+        setStatus(
+          `❌ <b>${esc(selectedClass)}</b> sudah memiliki 2 tema. Maksimal 2 tema.`,
+          "error"
+        );
+
+        return;
+      }
+
+
+      /* Cek kata */
+
+      const latestConflict =
+        findWordConflict(
+          theme,
+          latestData
+        );
+
+
+      if (
+        latestConflict
+      ) {
+
+        setStatus(
+          `❌ Kata <b>“${esc(latestConflict.word)}”</b> sudah digunakan dalam tema <b>“${esc(latestConflict.theme)}”</b> oleh <b>${esc(latestConflict.takenBy)}</b>.`,
+          "error"
+        );
+
+        return;
+      }
+
+
+      setStatus(
+        "❌ Tema gagal direbut. Silakan coba lagi.",
+        "error"
+      );
+
+
+    } catch (error) {
+
+      console.error(
+        "TRANSACTION ERROR:",
+        error
+      );
+
+
+      setStatus(
+        `❌ Gagal merebut tema.<br>
+        <small>
+          ${esc(
+            error?.message ||
+            String(error)
+          )}
+        </small>`,
+        "error"
+      );
+
+
+    } finally {
+
+      takeBtn.disabled =
+        false;
+    }
+  };
+
+
+/* ==================================================
+   PILIH KELAS
+================================================== */
+
+classSelect.onchange =
+  () => {
+
+    localStorage.setItem(
+      "ybClass",
+      classSelect.value
+    );
+
+    render();
+  };
+
+
+/* ==================================================
+   GANTI KELAS
+================================================== */
+
+resetLocal.onclick =
+  () => {
+
+    classSelect.value =
+      "";
+
+    localStorage.removeItem(
+      "ybClass"
+    );
+
+    render();
+  };
+
+
+/* ==================================================
+   MULAI FIREBASE
+================================================== */
 
 async function start() {
 
   try {
 
-    console.log("1. Memulai Firebase");
+    console.log(
+      "1. Memulai Firebase..."
+    );
+
+
+    /* Cek config */
 
     if (!firebaseConfig) {
-      throw new Error("firebaseConfig tidak ditemukan");
+
+      throw new Error(
+        "firebaseConfig tidak ditemukan."
+      );
     }
 
-    if (!firebaseConfig.apiKey) {
-      throw new Error("apiKey Firebase kosong");
+
+    if (
+      !firebaseConfig.apiKey
+    ) {
+
+      throw new Error(
+        "API Key Firebase kosong."
+      );
     }
 
-    console.log("2. Firebase config ditemukan");
 
-    const app = initializeApp(firebaseConfig);
+    console.log(
+      "2. Firebase config ditemukan."
+    );
 
-    console.log("3. Firebase berhasil diinisialisasi");
 
-    db = getDatabase(app);
-    auth = getAuth(app);
+    /* Initialize */
 
-    console.log("4. Database dan Auth siap");
+    const app =
+      initializeApp(
+        firebaseConfig
+      );
+
+
+    console.log(
+      "3. Firebase berhasil diinisialisasi."
+    );
+
+
+    /* Database */
+
+    db =
+      getDatabase(
+        app
+      );
+
+
+    /* Auth */
+
+    auth =
+      getAuth(
+        app
+      );
+
+
+    console.log(
+      "4. Database dan Auth siap."
+    );
+
 
     setStatus(
       "⏳ Login Anonymous...",
       "info"
     );
 
-    const credential = await signInAnonymously(auth);
+
+    /* Anonymous login */
+
+    const credential =
+      await signInAnonymously(
+        auth
+      );
+
+
+    currentUser =
+      credential.user;
+
 
     console.log(
       "5. Anonymous berhasil:",
-      credential
+      currentUser.uid
     );
 
-    currentUser = credential.user;
 
     setStatus(
       "🟢 Anonymous berhasil — membaca database...",
       "success"
     );
 
+
+    /* ==================================================
+       REAL-TIME LISTENER
+    ================================================== */
+
     onValue(
-      ref(db, "themes"),
+
+      ref(
+        db,
+        "themes"
+      ),
 
       snapshot => {
-        records = snapshot.val() || {};
+
+        records =
+          snapshot.val() ||
+          {};
+
 
         render();
+
 
         setStatus(
           "🟢 Terhubung — sistem real-time aktif.",
           "success"
         );
       },
+
 
       error => {
 
@@ -276,14 +981,29 @@ async function start() {
           error
         );
 
+
         setStatus(
           `❌ Database error:<br>
-           <b>${esc(error?.code || "TIDAK ADA KODE")}</b><br>
-           ${esc(error?.message || String(error))}`,
+
+          <b>
+            ${esc(
+              error?.code ||
+              "UNKNOWN"
+            )}
+          </b>
+
+          <br>
+
+          ${esc(
+            error?.message ||
+            String(error)
+          )}`,
+
           "error"
         );
       }
     );
+
 
   } catch (error) {
 
@@ -291,48 +1011,64 @@ async function start() {
       "======================"
     );
 
+
     console.error(
       "FIREBASE ERROR:",
       error
     );
+
 
     console.error(
       "ERROR CODE:",
       error?.code
     );
 
+
     console.error(
       "ERROR MESSAGE:",
       error?.message
     );
 
-    console.error(
-      "ERROR NAME:",
-      error?.name
-    );
 
     console.error(
       "======================"
     );
+
 
     const code =
       error?.code ||
       error?.name ||
       "UNKNOWN";
 
+
     const message =
       error?.message ||
-      String(error) ||
-      "Tidak ada pesan error.";
+      String(error);
+
 
     setStatus(
       `❌ Anonymous gagal.<br>
-       <b>KODE: ${esc(code)}</b><br>
-       <small>${esc(message)}</small>`,
+
+      <b>
+        KODE: ${esc(code)}
+      </b>
+
+      <br>
+
+      <small>
+        ${esc(message)}
+      </small>`,
+
       "error"
     );
   }
-};
+}
+
+
+/* ==================================================
+   JALANKAN SISTEM
+================================================== */
 
 render();
+
 start();
